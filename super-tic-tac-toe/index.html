@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta-Tic-Tac-Toe</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f4f4f4; flex-direction: column; }
+        #game-container { display: flex; flex-direction: column; align-items: center; }
+        #game { display: grid; grid-template-columns: repeat(3, auto); gap: 5px; }
+        .board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 3px; border: 3px solid black; padding: 5px; width: 30vw; height: 30vw; max-width: 300px; max-height: 300px; position: relative; }
+        .cell { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; font-size: 2vw; background: white; cursor: pointer; }
+        .cell.won { background: #ddd; cursor: default; }
+        .board.won::after { content: attr(data-winner); font-size: 4vw; color: black; position: absolute; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: rgba(255,255,255,0.8); }
+        .cell:empty:hover { background: #ccc; }
+        .highlight { border-color: red !important; }
+        #status { margin-top: 20px; font-size: 1.5rem; }
+        @media (max-width: 600px) {
+            .board { width: 25vw; height: 25vw; max-width: 100px; max-height: 100px; }
+            .cell { font-size: 4vw; }
+            .board.won::after { font-size: 8vw; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="game"></div>
+        <div id="status">X's turn</div>
+    </div>
+    <script>
+        const game = document.getElementById('game');
+        const status = document.getElementById('status');
+        let globalBoard = Array(9).fill(null).map(() => Array(9).fill(null));
+        let globalWins = Array(9).fill(null);
+        let currentPlayer = 'X';
+        let nextBoard = null;
+        
+        function createBoard(index) {
+            let board = document.createElement('div');
+            board.className = 'board';
+            board.dataset.index = index;
+            for (let i = 0; i < 9; i++) {
+                let cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.index = i;
+                cell.addEventListener('click', () => makeMove(index, i));
+                board.appendChild(cell);
+            }
+            return board;
+        }
+
+        function renderGame() {
+            game.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                let board = createBoard(i);
+                if (globalWins[i]) {
+                    board.classList.add('won');
+                    board.dataset.winner = globalWins[i];
+                }
+                for (let j = 0; j < 9; j++) {
+                    let cell = board.children[j];
+                    cell.textContent = globalBoard[i][j] || '';
+                    if (globalBoard[i][j] || globalWins[i]) cell.classList.add('won');
+                }
+                if (nextBoard === i || (nextBoard === null && !globalWins[i])) {
+                    board.classList.add('highlight');
+                }
+                game.appendChild(board);
+            }
+        }
+
+        function checkWin(board) {
+            const lines = [
+                [0,1,2], [3,4,5], [6,7,8],
+                [0,3,6], [1,4,7], [2,5,8],
+                [0,4,8], [2,4,6]
+            ];
+            for (let [a, b, c] of lines) {
+                if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+            }
+            return null;
+        }
+
+        function isFull(board) {
+            return board.every(cell => cell);
+        }
+
+        function makeMove(boardIndex, cellIndex) {
+            if (globalBoard[boardIndex][cellIndex] || globalWins[boardIndex]) return;
+            if (nextBoard !== null && nextBoard !== boardIndex) return;
+            
+            globalBoard[boardIndex][cellIndex] = currentPlayer;
+            let winner = checkWin(globalBoard[boardIndex]);
+            if (winner) globalWins[boardIndex] = winner;
+            if (isFull(globalBoard[boardIndex]) && !globalWins[boardIndex]) globalWins[boardIndex] = '-';
+            
+            if (checkWin(globalWins.filter(x => x !== '-'))) {
+                status.textContent = currentPlayer + " wins!";
+                game.innerHTML = '';
+                return;
+            }
+
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            nextBoard = globalWins[cellIndex] ? null : cellIndex;
+            status.textContent = currentPlayer + "'s turn";
+            renderGame();
+        }
+
+        renderGame();
+    </script>
+</body>
+</html>
