@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f4f4f4; flex-direction: column; }
+        #game-container { display: flex; flex-direction: column; align-items: center; }
+        #game { display: grid; grid-template-columns: repeat(3, auto); gap: 5px; }
+        .board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 3px; border: 3px solid black; padding: 5px; width: 30vw; height: 30vw; max-width: 300px; max-height: 300px; position: relative; }
+        .cell { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; font-size: 2vw; background: white; cursor: pointer; }
+        .cell.won { background: #ddd; cursor: default; }
+        .board.won::after { content: attr(data-winner); font-size: 4vw; color: black; position: absolute; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: rgba(255,255,255,0.8); }
+        .cell:empty:hover { background: #ccc; }
+        #status { margin-top: 20px; font-size: 1.5rem; }
+        @media (max-width: 600px) {
+            .board { width: 80vw; height: 80vw; max-width: 300px; max-height: 300px; }
+            .cell { font-size: 8vw; }
+            .board.won::after { font-size: 8vw; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="game" class="board"></div>
+        <div id="status">X's turn</div>
+    </div>
+    <script>
+        const game = document.getElementById('game');
+        const status = document.getElementById('status');
+        let board = Array(9).fill(null);
+        let currentPlayer = 'X';
+        let gameWon = false;
+
+        function renderGame() {
+            game.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                let cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.index = i;
+                cell.textContent = board[i] || '';
+                if (board[i]) cell.classList.add('won');
+                cell.addEventListener('click', () => makeMove(i));
+                game.appendChild(cell);
+            }
+        }
+
+        function checkWin(board) {
+            const lines = [
+                [0,1,2], [3,4,5], [6,7,8],
+                [0,3,6], [1,4,7], [2,5,8],
+                [0,4,8], [2,4,6]
+            ];
+            for (let [a, b, c] of lines) {
+                if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+            }
+            return null;
+        }
+
+        function isFull(board) {
+            return board.every(cell => cell);
+        }
+
+        function makeMove(index) {
+            if (board[index] || gameWon) return;
+            
+            board[index] = currentPlayer;
+            let winner = checkWin(board);
+            if (winner) {
+                gameWon = true;
+                status.textContent = currentPlayer + " wins!";
+                return renderGame();
+            }
+            if (isFull(board)) {
+                status.textContent = "It's a draw!";
+                return renderGame();
+            }
+
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            status.textContent = currentPlayer + "'s turn";
+            renderGame();
+        }
+
+        renderGame();
+    </script>
+</body>
+</html>
