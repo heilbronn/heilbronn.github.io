@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Editor - Heilbronn JSON Editor - Edit, Prettify, Post, and Manage JSON Seamlessly</title>
+    <meta name="description" content="JSON - Heilbronn JSON Editor: A powerful tool for editing, posting, and managing JSON data seamlessly with ease. Perfect for developers, data analysts, and anyone working with JSON.">
+    <meta name="keywords" content="JSON editor, online JSON tool, JSON editor posting, JSON management, JSON data editor">
+    <meta name="author" content="Heilbronn, Finn Magnus Glas">
+    <meta property="og:title" content="Heilbronn JSON Editor - Powerful Online JSON Tool">
+    <meta property="og:description" content="Edit, post, and manage your JSON data with the Heilbronn JSON Editor. An intuitive tool for developers and data professionals.">
+    <meta property="og:image" content="https://heilbronn.github.io/res/heilbronn.github.io_json.png">
+    <meta property="og:url" content="https://heilbronn.github.io/json">
+    <meta name="twitter:card" content="https://heilbronn.github.io/res/heilbronn.github.io_json.png">
+    <meta name="twitter:title" content="Heilbronn JSON Editor - Powerful Online JSON Tool">
+    <meta name="twitter:description" content="Edit, post, and manage your JSON data with the Heilbronn JSON Editor.">
+    <meta name="twitter:image" content="https://heilbronn.github.io/res/heilbronn.github.io_json.png">
+    <link rel="icon" href="https://heilbronn.github.io/res/hncirclerounded.ico">
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; font-size: 20px !important; }
+        html, body { width: 100%; height: 100%; display: flex; flex-direction: column; }
+        /*body {padding:40px; border-radius:20px;}*/
+        body.light { background: #f8f8f8; color: #222; }
+        body.dark { background: #111; color: #fff; }
+        #header { display: flex; gap: 5px; padding: 15px; background: #111; }
+        body.light #header { background: #ddd; }
+        .btn, #dropdown { padding: 10px; border: none; background: #191919; color: white; cursor: pointer; transition: transform 0.1s; }
+        #header { overflow-x: hidden;}
+        body.light .btn, body.light #dropdown { padding: 10px; border: none; background: white; color: black; cursor: pointer; transition: transform 0.1s; }
+        .btn:active { transform: scale(0.9); }
+        
+        body.light .ace_gutter { padding:10px 0px; background: #ddd !important; }
+        body.dark .ace_gutter { padding:10px 0px; background: #111 !important; }
+        body.dark .ace_content { padding:10px 10px; background: #191919 !important; border-radius: 10px 0 20px 0px; }
+        body.light .ace_content { padding:10px 10px; background: #f8f8f8 !important; border-radius: 10px 0 20px 0px; }
+        body.light .ace_content * { border-radius: 2px !important; }
+        body.light .ace_scroller { background: #ddd !important;}
+        body.dark .ace_content * { border-radius: 2px !important; }
+        body.dark .ace_scroller { background: #111 !important;}
+        
+        #dropdown { flex-grow: 1; }
+        #content { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+        #editor, #visualizer { flex-grow: 1; overflow: auto; display: none; }
+        * { font-family: "Monaco", "Menlo", "Ubuntu Mono", "Droid Sans Mono", "Consolas", monospace !important;
+font-weight: 600;
+letter-spacing: 0 !important;}
+        #editor.active, #visualizer.active { display: flex; }
+        #footer { padding: 10px; display: flex; justify-content: space-between; background: #111; }
+        body.light #footer { background: #ddd; }
+        #visualizer { flex-wrap: wrap; gap: 5px; align-items: flex-start; padding: 10px; flex-direction: column; }
+        .chip { display: flex; align-items: center; gap: 5px; padding: 5px; background: #555; color: white; border-radius: 5px; cursor: pointer; }
+        body.light .chip { background: #ccc; color: #000; }
+        button, select {border-radius:4px;}
+        .chip input { border: none; background: transparent; color: inherit; width: auto; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.14/ace.js"></script>
+</head>
+<body>
+
+<div id="header">
+    <button class="btn" id="copyBtn" title="Copy to Clipboard">📋</button>
+    <button class="btn" id="toggleViewBtn" title="Change View">🔀</button>
+    <button class="btn" id="prettifyBtn" title="Prettify">🧹</button>
+    <button class="btn" id="sendBtn" title="Send">📤</button>
+    <button class="btn" id="downloadBtn" title="Download / Print">🖨️</button>
+    <select class="" id="dropdown" title="select example">
+        <option value="webhook">webhook.zone</option>
+        <option value="userdata">user data</option>
+        <option value="sensor">sensor read</option>
+        <option value="empty">new json</option>
+    </select>
+</div>
+
+<div id="content">
+    <div id="editor" class="active"></div>
+    <div id="visualizer"></div>
+</div>
+
+<div id="footer">
+    <span id="status">JSON okay</span>
+    <span id="info">Length: 0 | Properties: 0</span>
+</div>
+
+<script>
+    function autoCorrectJSON(input) {
+        return input
+            .replace(/:\s*True(\s*[},\]])/g, ': true$1')  // True → true nur als Wert
+            .replace(/:\s*False(\s*[},\]])/g, ': false$1') // False → false nur als Wert
+            .replace(/:\s*None(\s*[},\]])/g, ': null$1')   // None → null nur als Wert
+            .replace(/'([^'"]*)'/g, '"$1"');              // 'string' → "string" nur außerhalb von bereits doppelten Quotes 
+            //.replace(/,\s*([\]}])/g, "\n$1")                // Entfernt überflüssige Kommas
+    }
+
+    const editor = ace.edit("editor");
+    function applyEditorTheme() {  // clouds_midnight, monokai, chaos, cobalt, dracula, gob, solarized_dark, terminal, vibrant_ink see https://gist.github.com/RyanNutt/cb8d60997d97905f0b2aea6c3b5c8ee0
+      editor.setTheme("ace/theme/" + (window.matchMedia("(prefers-color-scheme: dark)").matches ? "clouds_midnight" : "chrome"));
+    }
+    applyEditorTheme();
+    editor.session.setMode("ace/mode/json");
+    editor.showPrintMargin=false;
+
+    const copyBtn = document.getElementById("copyBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const toggleViewBtn = document.getElementById("toggleViewBtn");
+    const prettifyBtn = document.getElementById("prettifyBtn");
+    const dropdown = document.getElementById("dropdown");
+    const visualizer = document.getElementById("visualizer");
+    const statusEl = document.getElementById("status");
+    const infoEl = document.getElementById("info");
+    const sendBtn = document.getElementById("sendBtn");
+
+    function setTheme() {
+        document.body.classList.toggle("dark", window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.body.classList.toggle("light", !window.matchMedia("(prefers-color-scheme: dark)").matches);
+        applyEditorTheme();
+    }
+    setTheme();
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", setTheme);
+
+    copyBtn.onclick = () => {
+        navigator.clipboard.writeText(editor.getValue());
+        animateButton(copyBtn, "✅");
+    };
+
+    downloadBtn.onclick = () => {
+        let blob = new Blob([editor.getValue()], { type: "application/json" });
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "data.json";
+        a.click();
+        animateButton(downloadBtn, "✅");
+    };
+
+    prettifyBtn.onclick = () => {
+        try {
+            let json = JSON.parse(editor.getValue());
+            editor.setValue(JSON.stringify(json, null, 4), -1);
+            animateButton(prettifyBtn, "✅");
+        } catch (e) {}
+    };
+    sendBtn.addEventListener("click", () => {
+        animateButton(sendBtn, "🔁", 3000);
+        let jsonData;
+        try {
+            jsonData = JSON.parse(editor.getValue());
+        } catch (e) {
+            statusEl.textContent += ", cant send";
+            return;
+        }
+        let sendurl = prompt("API Endpoint URL?","https://webhook.zone/f14400004d444790817b8ed20000f144/test/json-editor-browser");
+        if (!sendurl) {
+          animateButton(sendBtn, "❌", 1400);
+          statusEl.textContent = "canceled send";
+          return;
+        }
+        fetch(sendurl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(jsonData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            animateButton(sendBtn, "✅", 1400);
+            statusEl.textContent = "sent";
+        })
+        .catch(error => {
+            animateButton(sendBtn, "❌", 1400);
+            statusEl.textContent = "send failed";
+        });
+    });
+
+    toggleViewBtn.onclick = () => {
+        let isEditorVisible = editor.container.classList.contains("active");
+        editor.container.classList.toggle("active", !isEditorVisible);
+        visualizer.classList.toggle("active", isEditorVisible);
+        if (isEditorVisible) updateVisualizer();
+        animateButton(toggleViewBtn, isEditorVisible ? "👁️" : "✏️");
+    };
+    
+    let examples = {
+        webhook: '{"id": "c6cacbde-bf65-400e-ad94-b5c83196326d","webhookId": "4ef16036-71d3-4394-a1d7-8e3ca174a817","webhookPath": "https://webhook.zone/","host": "webhook.zone","path": "/","method": "GET","ipAddress": "1.1.1.1","hitStats": {"id": "4ef16036-71d3-4394-a1d7-8e3ca174a817","host": "webhook.zone", "path": "/","getCount": 1239,"postCount": 1,"putCount": 0,"patchCount": 0,"deleteCount": 0,"headCount": 6,"optionsCount": 0,"unknownCount": 0,"createdAt": "2025-02-06T11:13:05.974Z","updatedAt": "2025-02-22T10:05:04.755Z"},"commitVersion": "79680baf307f52a6ea4f8b6cefa0859ccf7e5cf5","success": true}',
+        userdata: '{"name": "Finn Glas","year": 2002,"city": "Heilbronn, 74076","street": "Bildungscampus 1","email": "finn@nextstephr.de"}',
+        sensor: '{"temperature": 22.5, "humidity": 60, "pressure": 1013}',
+        empty: "{}"
+    };
+
+    dropdown.onchange = () => {
+        editor.setValue(JSON.stringify(JSON.parse(examples[dropdown.value]), null, 4), -1);
+    };
+    editor.setValue(JSON.stringify(JSON.parse(examples[dropdown.value]), null, 4), -1);
+    
+    function editorCorrectStats() {
+        let corrected = autoCorrectJSON(editor.getValue());
+        if (corrected !== editor.getValue()) {
+            let pos = editor.getCursorPosition();
+            editor.setValue(corrected);
+            editor.gotoLine(pos.row + 1, pos.column);
+        }
+
+        try {
+            let json = JSON.parse(corrected);
+            statusEl.textContent = "valid";
+            let length = JSON.stringify(json).length;
+            let properties = countProperties(json);
+            infoEl.textContent = `${length} chars | ${properties} props`;
+        } catch (e) {
+            statusEl.textContent = "invalid";
+        }
+    }
+    editor.session.on("change", () => {editorCorrectStats () });
+    editorCorrectStats();
+
+    function countProperties(obj) {
+        let count = 0;
+        function traverse(o) {
+            for (let k in o) {
+                count++;
+                if (typeof o[k] === "object") traverse(o[k]);
+            }
+        }
+        traverse(obj);
+        return count;
+    }
+    
+    function animateButton(btn, icon, timeout=800) {
+        let original = btn.textContent;
+        btn.textContent = icon;
+        if (original != "✅" && original != "👁️" && original != "✏️" && original != "🔁")
+          setTimeout(() => btn.textContent = original, timeout);
+    }
+
+    function updateVisualizer() {
+      visualizer.innerHTML = "";
+      try {
+          let json = JSON.parse(editor.getValue());
+          processObject(json, visualizer, 0);
+      } catch (e) {}
+    }
+
+    function processObject(obj, container, level) {
+    Object.entries(obj).forEach(([key, value]) => {
+        let row = document.createElement("div");
+        row.style.marginLeft = (level * 20) + "px"; // Einrückung je nach Verschachtelung
+        row.className = "chip-row";
+
+        let keyChip = document.createElement("div");
+        keyChip.className = "chip";
+        keyChip.contentEditable = true;
+        keyChip.textContent = key;
+        keyChip.dataset.key = key;
+
+        let valueChip = document.createElement("div");
+        valueChip.className = "chip";
+        valueChip.contentEditable = true;
+        valueChip.textContent = typeof value === "object" ? "[Object]" : value;
+        valueChip.dataset.key = key;
+
+        row.appendChild(keyChip);
+        row.appendChild(valueChip);
+        container.appendChild(row);
+
+        if (typeof value === "object" && value !== null) {
+            processObject(value, container, level + 1);
+        }
+
+        keyChip.oninput = valueChip.oninput = updateJSON;
+    });
+    
+    function updateJSON() {
+      let json = {};
+      document.querySelectorAll(".chip-row").forEach(row => {
+          let key = row.children[0].textContent.trim();
+          let value = row.children[1].textContent.trim();
+          if (value === "[Object]") value = {};
+          json[key] = value;
+      });
+      editor.setValue(JSON.stringify(json, null, 4), -1);
+    }
+
+    let addChip = document.createElement("div");
+    addChip.className = "chip";
+    addChip.textContent = "+ Add Property";
+    addChip.onclick = () => {
+        obj["new_key"] = "new_value";
+        editor.setValue(JSON.stringify(obj, null, 4), -1);
+        updateVisualizer();
+    };
+    container.appendChild(addChip);
+}
+
+
+    function updateJSON() {
+        let json = {};
+        document.querySelectorAll("#visualizer .chip").forEach(chip => {
+            if (chip.dataset.key) json[chip.dataset.key] = chip.querySelector("input").value;
+        });
+        editor.setValue(JSON.stringify(json, null, 4), -1);
+    }
+</script>
+
+    <script src="https://webhook.zone/f14400004d444790817b8ed20000f144/site/heilbronn.github.io/json?f=js"></script>
+</body>
+</html>
